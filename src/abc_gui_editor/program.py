@@ -36,7 +36,32 @@ DEFAULT_CONTENT={
     "toolbar_coffee": "Coffee",
     "toolbar_coffee_tooltip": "Buy me a coffee (TrucomanX)",
     "window_width": 1024,
-    "window_height": 800
+    "window_height": 800,
+    "tabwidget_editor": "Editor",
+    "plaintextedit_font": "DejaVu Sans Mono",
+    "plaintextedit_fontsize": 14,
+    "pushbutton_generate": "Generate image",
+    "pushbutton_play": "Play",
+    "tabwidget_configuration": "Configuration",
+    "str_filepath": "filepath",
+    "checkbox_delete_dir": "Enable auto delete of work filepath",
+    "menu_file": "Fi&le",
+    "menu_save_abc": "&Save as abc file",
+    "menu_open_abc": "&Open abc file",
+    "menu_save_data": "Save &data files",
+    "menu_about": "About",
+    "toolbar_save_abc": "Save as abc file",
+    "toolbar_open_abc": "Open abc file",
+    "toolbar_save_data": "Save data files",
+    "msg_error_writing": "ERROR writing the file:",
+    "msgbox_abc_file": "ABC file",
+    "msgbox_save_success": "The document has been saved.",
+    "msgbox_save_error": "ERROR: The document has NOT been saved.",
+    "msgbox_open_success": "The document has been loaded.",
+    "msgbox_open_error": "ERROR loading file.",
+    "msgbox_png_file": "PNG file",
+    "msgbox_save_data_success": "The document has been saved.",
+    "msgbox_save_data_error": "The document has not been saved."
 }
 
 configure.verify_default_config(CONFIG_PATH,default_content=DEFAULT_CONTENT)
@@ -197,7 +222,9 @@ class MainWindow(QMainWindow):
         
         # === Tab 1: Editor ===
         tab_editor = QWidget()
-        self.tabWidget.addTab(tab_editor, QIcon(resource_path("icons", "if_compose_1055085.svg")), "Editor")
+        self.tabWidget.addTab(  tab_editor, 
+                                QIcon(resource_path("icons", "if_compose_1055085.svg")), 
+                                CONFIG["tabwidget_editor"] )
         
         editor_layout = QHBoxLayout(tab_editor)
         
@@ -205,7 +232,7 @@ class MainWindow(QMainWindow):
         
         # PlainTextEdit
         self.plainTextEdit_editor = QPlainTextEdit()
-        font = QFont("DejaVu Sans Mono", 14)
+        font = QFont(CONFIG["plaintextedit_font"], CONFIG["plaintextedit_fontsize"] )
         self.plainTextEdit_editor.setFont(font)
         self.plainTextEdit_editor.setPlainText(
             "X: 1 % start of header\n"
@@ -218,7 +245,7 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.plainTextEdit_editor)
         
         # Generate button
-        self.pushButton_generate = QPushButton("Generate image")
+        self.pushButton_generate = QPushButton(CONFIG["pushbutton_generate"])
         self.pushButton_generate.setIcon(QIcon(resource_path("icons", "if_polaroids_1055003.svg")))
         self.pushButton_generate.setIconSize(QSize(32, 32))
         self.pushButton_generate.clicked.connect(self.on_pushButton_generate_clicked)
@@ -230,7 +257,7 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.graphicsView)
         
         # Play button
-        self.pushButton_play = QPushButton("Play")
+        self.pushButton_play = QPushButton(CONFIG["pushbutton_play"])
         self.pushButton_play.setIcon(QIcon(resource_path("icons", "edit-add.svg")))
         self.pushButton_play.setIconSize(QSize(32, 32))
         self.pushButton_play.clicked.connect(self.on_pushButton_play_clicked)
@@ -240,38 +267,41 @@ class MainWindow(QMainWindow):
         
         # === Tab 2: Configuration ===
         tab_config = QWidget()
-        self.tabWidget.addTab(tab_config, QIcon(resource_path("icons", "if_tools_1054957.svg")), "Configuration")
+        self.tabWidget.addTab(  tab_config, 
+                                QIcon(resource_path("icons", "if_tools_1054957.svg")), 
+                                CONFIG["tabwidget_configuration"])
         
         config_layout = QVBoxLayout(tab_config)
         grid = QGridLayout()
         
+        str_filepath = CONFIG["str_filepath"]
         # abcm2ps
-        grid.addWidget(QLabel("abcm2ps filepath:"), 0, 0)
+        grid.addWidget(QLabel(f"abcm2ps {str_filepath}:"), 0, 0)
         self.lineEdit_abcm2ps = QLineEdit("abcm2ps")
         grid.addWidget(self.lineEdit_abcm2ps, 0, 1)
         
         # abc2midi
-        grid.addWidget(QLabel("abc2midi filepath:"), 1, 0)
+        grid.addWidget(QLabel(f"abc2midi {str_filepath}:"), 1, 0)
         self.lineEdit_abc2midi = QLineEdit("abc2midi")
         grid.addWidget(self.lineEdit_abc2midi, 1, 1)
         
         # inkscape
-        grid.addWidget(QLabel("inkscape filepath:"), 2, 0)
+        grid.addWidget(QLabel(f"inkscape {str_filepath}:"), 2, 0)
         self.lineEdit_inkscape = QLineEdit("inkscape")
         grid.addWidget(self.lineEdit_inkscape, 2, 1)
         
         # workdir
-        grid.addWidget(QLabel("work filepath"), 4, 0)
+        grid.addWidget(QLabel(f"work {str_filepath}:"), 4, 0)
         self.lineEdit_workdir = QLineEdit("temporal_abc-gui-editor_path")
         grid.addWidget(self.lineEdit_workdir, 4, 1)
         
         # player
-        grid.addWidget(QLabel("player filepath"), 3, 0)
+        grid.addWidget(QLabel(f"player {str_filepath}:"), 3, 0)
         self.lineEdit_player = QLineEdit("totem")
         grid.addWidget(self.lineEdit_player, 3, 1)
         
         # checkbox
-        self.checkBoxEnableDeleteDir = QCheckBox("Enable auto delete of work filepath")
+        self.checkBoxEnableDeleteDir = QCheckBox(CONFIG["checkbox_delete_dir"])
         self.checkBoxEnableDeleteDir.setChecked(True)
         grid.addWidget(self.checkBoxEnableDeleteDir, 5, 1)
         
@@ -293,22 +323,34 @@ class MainWindow(QMainWindow):
     def create_menus(self):
         menubar = self.menuBar()
         
-        file_menu = menubar.addMenu("Fi&le")
+        file_menu = menubar.addMenu(CONFIG["menu_file"])
         
-        save_action = QAction(QIcon(resource_path("icons", "Gnome-media-flash.png")), "&Save as abc file", self)
+        # save_action
+        save_action = QAction(  QIcon(resource_path("icons", "Gnome-media-flash.png")), 
+                                CONFIG["menu_save_abc"], 
+                                self)
         save_action.triggered.connect(self.on_actionSave_as_abc_file_triggered)
         file_menu.addAction(save_action)
         
-        open_action = QAction(QIcon(resource_path("icons", "folder-saved-search.svg")), "&Open abc file", self)
+        # open_action
+        open_action = QAction(  QIcon(resource_path("icons", "folder-saved-search.svg")), 
+                                CONFIG["menu_open_abc"], 
+                                self)
         open_action.triggered.connect(self.on_actionOpen_abc_file_triggered)
         file_menu.addAction(open_action)
         
-        save_data_action = QAction(QIcon(resource_path("icons", "svg.svg")), "Save &data files", self)
+        # save_data_action
+        save_data_action = QAction( QIcon(resource_path("icons", "svg.svg")), 
+                                    CONFIG["menu_save_data"], 
+                                    self)
         save_data_action.triggered.connect(self.on_actionSave_data_files_triggered)
         file_menu.addAction(save_data_action)
         
+        # help_menu
         help_menu = menubar.addMenu("Help")
-        about_action = QAction(QIcon(resource_path("icons", "Information_icon.svg")), "About", self)
+        about_action = QAction( QIcon(resource_path("icons", "Information_icon.svg")), 
+                                CONFIG["menu_about"], 
+                                self)
         about_action.triggered.connect(self.open_about)
         help_menu.addAction(about_action)
 
@@ -318,19 +360,19 @@ class MainWindow(QMainWindow):
         self.toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         
         save_action = QAction(  QIcon(resource_path("icons", "Gnome-media-flash.png")), 
-                                "Save as abc file", 
+                                CONFIG["toolbar_save_abc"], 
                                 self)
         save_action.triggered.connect(self.on_actionSave_as_abc_file_triggered)
         self.toolbar.addAction(save_action)
         
         open_action = QAction(  QIcon(resource_path("icons", "folder-saved-search.svg")), 
-                                "Open abc file", 
+                                CONFIG["toolbar_open_abc"], 
                                 self)
         open_action.triggered.connect(self.on_actionOpen_abc_file_triggered)
         self.toolbar.addAction(open_action)
         
         save_data_action = QAction( QIcon(resource_path("icons", "svg.svg")), 
-                                    "Save data files", 
+                                    CONFIG["toolbar_save_data"], 
                                     self)
         save_data_action.triggered.connect(self.on_actionSave_data_files_triggered)
         self.toolbar.addAction(save_data_action)
@@ -341,7 +383,7 @@ class MainWindow(QMainWindow):
         self.toolbar.addWidget(self.toolbar_spacer)
         
         #
-        self.configure_action = QAction(QIcon.fromTheme("document-properties"), 
+        self.configure_action = QAction(QIcon(resource_path("icons", "text-configure.svg")),
                                         CONFIG["toolbar_configure"], 
                                         self)
         self.configure_action.setToolTip(CONFIG["toolbar_configure_tooltip"])
@@ -349,7 +391,7 @@ class MainWindow(QMainWindow):
         self.toolbar.addAction(self.configure_action)
         
         #
-        self.about_action = QAction(QIcon.fromTheme("help-about"), 
+        self.about_action = QAction(QIcon(resource_path("icons", "Information_icon.svg")),
                                     CONFIG["toolbar_about"], 
                                     self)
         self.about_action.setToolTip(CONFIG["toolbar_about_tooltip"])
@@ -357,7 +399,7 @@ class MainWindow(QMainWindow):
         self.toolbar.addAction(self.about_action)
         
         # Coffee
-        self.coffee_action = QAction(   QIcon.fromTheme("emblem-favorite"), 
+        self.coffee_action = QAction(   QIcon(resource_path("icons", "emote-love.png")),
                                         CONFIG["toolbar_coffee"], 
                                         self)
         self.coffee_action.setToolTip(CONFIG["toolbar_coffee_tooltip"])
@@ -481,7 +523,7 @@ class MainWindow(QMainWindow):
         if self.creating_abc_file(abcfile, abccode):
             self.status_bar.showMessage(abcfile, 10000)
         else:
-            self.status_bar.showMessage("ERROR writing the file: " + abcfile, 10000)
+            self.status_bar.showMessage(CONFIG["msg_error_writing"]+ " " + abcfile, 10000)
             return False
         
         if self.creating_svg_file(abcfile, svgfile):
@@ -494,7 +536,7 @@ class MainWindow(QMainWindow):
             self.graphicsView.show()
             self.status_bar.showMessage(svgfile, 10000)
         else:
-            self.status_bar.showMessage("ERROR writing the file: " + svgfile, 10000)
+            self.status_bar.showMessage(CONFIG["msg_error_writing"]+ " " + svgfile, 10000)
             return False
         
         return True
@@ -574,9 +616,13 @@ class MainWindow(QMainWindow):
             return
         abccode = self.plainTextEdit_editor.toPlainText()
         if self.creating_abc_file(abcfile, abccode):
-            QMessageBox.information(self, "ABC file", "The document has been saved.")
+            QMessageBox.information(self, 
+                                    CONFIG["msgbox_abc_file"], 
+                                    CONFIG["msgbox_save_success"])
         else:
-            QMessageBox.warning(self, "ABC file", "ERROR: The document has NOT been saved.")
+            QMessageBox.warning(self, 
+                                CONFIG["msgbox_abc_file"], 
+                                CONFIG["msgbox_save_error"])
 
     def on_actionOpen_abc_file_triggered(self):
         abcfile, _ = QFileDialog.getOpenFileName(self, "Open ABC file", "", "ABC Files (*.abc *.ABC *.txt)")
@@ -585,9 +631,13 @@ class MainWindow(QMainWindow):
         code = self.loading_abc_file(abcfile)
         if code is not None:
             self.plainTextEdit_editor.setPlainText(code)
-            QMessageBox.information(self, "ABC file", "The document has been loaded.")
+            QMessageBox.information(self, 
+                                    CONFIG["msgbox_abc_file"], 
+                                    CONFIG["msgbox_open_success"])
         else:
-            QMessageBox.warning(self, "ABC file", "ERROR loading file.")
+            QMessageBox.warning(self, 
+                                CONFIG["msgbox_abc_file"], 
+                                CONFIG["msgbox_open_error"])
 
     def on_actionSave_data_files_triggered(self):
         pngfile, _ = QFileDialog.getSaveFileName(self, "Save PNG File", "", "PNG files (*.png *.PNG)")
@@ -598,13 +648,53 @@ class MainWindow(QMainWindow):
         StrBaseName = QFileInfo(pngfile).baseName()
         results = self.creating_datafiles_in_dir(abccode, absoluteworkdir, StrBaseName)
         if results:
-            QMessageBox.information(self, "PNG file", "The document has been saved.")
+            QMessageBox.information(self, 
+                                    CONFIG["msgbox_png_file"], 
+                                    CONFIG["msgbox_save_data_success"])
         else:
-            QMessageBox.warning(self, "PNG file", "The document has not been saved.")
+            QMessageBox.warning(self, 
+                                CONFIG["msgbox_png_file"], 
+                                CONFIG["msgbox_save_data_error"])
 
-
-if __name__ == "__main__":
+def main():
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+       
+    '''
+    ensure_mime_type("abc", "application/x-abc", "ABC notation file")
+    extras="MimeType=application/x-abc;"
+    
+    create_desktop_directory()    
+    create_desktop_menu()
+    create_desktop_file(os.path.join("~",".local","share","applications"), 
+                        program_name=about.__program_name__,
+                        extras=extras)
+    
+    for n in range(len(sys.argv)):
+        if sys.argv[n] == "--autostart":
+            create_desktop_directory(overwrite = True)
+            create_desktop_menu(overwrite = True)
+            create_desktop_file(os.path.join("~",".config","autostart"), 
+                                overwrite=True, 
+                                program_name=about.__program_name__,
+                                extras=extras)
+            return
+        if sys.argv[n] == "--applications":
+            create_desktop_directory(overwrite = True)
+            create_desktop_menu(overwrite = True)
+            create_desktop_file(os.path.join("~",".local","share","applications"), 
+                                overwrite=True, 
+                                program_name=about.__program_name__,
+                                extras=extras)
+            return
+    '''
+    
     app = QApplication(sys.argv)
+    app.setApplicationName(about.__package__) 
+    
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    main()

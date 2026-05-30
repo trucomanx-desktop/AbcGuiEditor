@@ -143,7 +143,8 @@ def main():
     signal.signal(signal.SIGINT, signal.SIG_DFL)
        
     '''
-    extras="" # "MimeType=text/vnd.graphviz;"
+    #ensure_mime_type("npy", "application/x-npy", "NumPy array file")
+    extras="" # "MimeType=text/vnd.graphviz;" # "MimeType=application/x-npy;"
     
     create_desktop_directory()    
     create_desktop_menu()
