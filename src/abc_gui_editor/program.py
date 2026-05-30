@@ -671,8 +671,7 @@ class MainWindow(QMainWindow):
 
 def main():
     signal.signal(signal.SIGINT, signal.SIG_DFL)
-       
-    '''
+    
     ensure_mime_type("abc", "application/x-abc", "ABC notation file")
     extras="MimeType=application/x-abc;"
     
@@ -699,7 +698,6 @@ def main():
                                 program_name=about.__program_name__,
                                 extras=extras)
             return
-    '''
     
     filepath=""
     if len(sys.argv)>1:
