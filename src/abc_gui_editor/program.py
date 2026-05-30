@@ -1,19 +1,55 @@
-import sys
 import os
+import sys
+import signal
+import subprocess
+
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout,
     QGridLayout, QPlainTextEdit, QPushButton, QGraphicsView, QGraphicsScene,
     QLineEdit, QLabel, QCheckBox, QMenuBar, QMenu, QAction, QToolBar,
-    QFileDialog, QMessageBox, QStatusBar
+    QFileDialog, QMessageBox, QStatusBar, QSizePolicy
 )
-from PyQt5.QtGui import QIcon, QFont, QTextCharFormat, QColor, QPixmap, QPainter
-from PyQt5.QtCore import QDir, QFileInfo, QFile, QTextStream, QProcess, QRegularExpression, Qt, QRegularExpressionMatchIterator, QSize
+
+from PyQt5.QtGui import QIcon, QDesktopServices, QSyntaxHighlighter, QFont, QTextCharFormat, QColor, QPixmap, QPainter, QTextCursor
+from PyQt5.QtCore import QDir, QFileInfo, QFile, QTextStream, QProcess, QRegularExpression, Qt, QUrl, QRegularExpressionMatchIterator, QSize
 from PyQt5.QtSvg import QSvgRenderer
 
+import abc_gui_editor.about as about
+import abc_gui_editor.modules.configure as configure 
+from abc_gui_editor.modules.resources import resource_path
 
-class Highlighter:
+from abc_gui_editor.modules.wabout    import show_about_window
+from abc_gui_editor.desktop import create_desktop_file, create_desktop_directory, create_desktop_menu
+
+
+# ---------- Path to config file ----------
+CONFIG_PATH = os.path.join( os.path.expanduser("~"),
+                            ".config", 
+                            about.__package__, 
+                            "config.json" )
+
+DEFAULT_CONTENT={   
+    "toolbar_configure": "Configure",
+    "toolbar_configure_tooltip": "Open the configure Json file of program GUI",
+    "toolbar_about": "About",
+    "toolbar_about_tooltip": "About the program",
+    "toolbar_coffee": "Coffee",
+    "toolbar_coffee_tooltip": "Buy me a coffee (TrucomanX)",
+    "window_width": 1024,
+    "window_height": 800
+}
+
+configure.verify_default_config(CONFIG_PATH,default_content=DEFAULT_CONTENT)
+
+CONFIG=configure.load_config(CONFIG_PATH)
+
+# ---------------------------------------
+
+
+
+class Highlighter(QSyntaxHighlighter):
     def __init__(self, parent=None):
-        self.parent = parent  # QTextDocument
+        super().__init__(parent)
         self.highlightingRules = []
         
         # keyword tipo1 - darkMagenta
@@ -35,10 +71,8 @@ class Highlighter:
         keywordFormat2.setFontWeight(QFont.Bold)
         
         keywordPatterns2 = [
-            r"\bnone\b", r"\bperc\b",
-            r"\bup\b", r"\bdown\b",
-            r"\bDmajor\b", r"\bDminor\b",
-            r"\bDmaj\b", r"\bDmin\b",
+            r"\bnone\b", r"\bperc\b", r"\bup\b", r"\bdown\b",
+            r"\bDmajor\b", r"\bDminor\b", r"\bDmaj\b", r"\bDmin\b",
             r"\bAeolian\b", r"\bPhrygian\b", r"\bLocrian\b",
             r"\bDorian\b", r"\bMixolydian\b", r"\bIonian\b"
         ]
@@ -58,13 +92,6 @@ class Highlighter:
         for pattern in keywordPatterns3:
             rule = {'pattern': QRegularExpression(pattern), 'format': keywordFormat3}
             self.highlightingRules.append(rule)
-        
-        # Class format (not heavily used in ABC)
-        classFormat = QTextCharFormat()
-        classFormat.setFontWeight(QFont.Bold)
-        classFormat.setForeground(Qt.darkMagenta)
-        rule = {'pattern': QRegularExpression(r"\bQ[A-Za-z]+\b"), 'format': classFormat}
-        self.highlightingRules.append(rule)
         
         # Quotation
         quotationFormat = QTextCharFormat()
@@ -91,39 +118,55 @@ class Highlighter:
         self.commentStartExpression = QRegularExpression(r"/\*")
         self.commentEndExpression = QRegularExpression(r"\*/")
 
-    def highlightBlock(self, text):
+    def highlightBlock(self, text: str):
+        # Regras normais (palavras-chave, símbolos, comentários de linha, etc.)
         for rule in self.highlightingRules:
             matchIterator = rule['pattern'].globalMatch(text)
             while matchIterator.hasNext():
                 match = matchIterator.next()
-                self.parent.setFormat(match.capturedStart(), match.capturedLength(), rule['format'])
+                self.setFormat(match.capturedStart(), match.capturedLength(), rule['format'])
         
-        self.parent.setCurrentBlockState(0)
+        # Multi-line comments (se necessário)
+        self.setCurrentBlockState(0)
         
         startIndex = 0
-        if self.parent.previousBlockState() != 1:
-            startIndex = text.indexOf(self.commentStartExpression)
-        
+        if self.previousBlockState() != 1:
+            # Usa Python str.find com regex
+            match = self.commentStartExpression.match(text, startIndex)
+            startIndex = match.capturedStart() if match.hasMatch() else -1
+
         while startIndex >= 0:
             match = self.commentEndExpression.match(text, startIndex)
             endIndex = match.capturedStart()
             commentLength = 0
+            
             if endIndex == -1:
-                self.parent.setCurrentBlockState(1)
+                self.setCurrentBlockState(1)
                 commentLength = len(text) - startIndex
             else:
                 commentLength = endIndex - startIndex + match.capturedLength()
             
-            self.parent.setFormat(startIndex, commentLength, self.multiLineCommentFormat)
-            startIndex = text.indexOf(self.commentStartExpression, startIndex + commentLength)
+            self.setFormat(startIndex, commentLength, self.multiLineCommentFormat)
+            
+            # Próxima ocorrência
+            match = self.commentStartExpression.match(text, startIndex + commentLength)
+            startIndex = match.capturedStart() if match.hasMatch() else -1
+
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ABC GUI Editor")
-        self.resize(1250, 700)
-        self.setMinimumSize(800, 700)
+
+        self.setWindowTitle(about.__program_name__)
+        self.resize(CONFIG["window_width"], CONFIG["window_height"])
+        
+        ## Icon
+        # Get base directory for icons
+        self.icon_path = resource_path("icons", "logo.svg")
+        self.setWindowIcon(QIcon(self.icon_path)) 
+        
+        
         
         self.highlighter = None
         self.scene = QGraphicsScene(self)
@@ -154,7 +197,7 @@ class MainWindow(QMainWindow):
         
         # === Tab 1: Editor ===
         tab_editor = QWidget()
-        self.tabWidget.addTab(tab_editor, QIcon("icons/if_compose_1055085.png"), "Editor")
+        self.tabWidget.addTab(tab_editor, QIcon(resource_path("icons", "if_compose_1055085.svg")), "Editor")
         
         editor_layout = QHBoxLayout(tab_editor)
         
@@ -176,7 +219,7 @@ class MainWindow(QMainWindow):
         
         # Generate button
         self.pushButton_generate = QPushButton("Generate image")
-        self.pushButton_generate.setIcon(QIcon("icons/if_polaroids_1055003.png"))
+        self.pushButton_generate.setIcon(QIcon(resource_path("icons", "if_polaroids_1055003.svg")))
         self.pushButton_generate.setIconSize(QSize(32, 32))
         self.pushButton_generate.clicked.connect(self.on_pushButton_generate_clicked)
         left_layout.addWidget(self.pushButton_generate)
@@ -188,7 +231,7 @@ class MainWindow(QMainWindow):
         
         # Play button
         self.pushButton_play = QPushButton("Play")
-        self.pushButton_play.setIcon(QIcon("icons/edit-add.png"))
+        self.pushButton_play.setIcon(QIcon(resource_path("icons", "edit-add.svg")))
         self.pushButton_play.setIconSize(QSize(32, 32))
         self.pushButton_play.clicked.connect(self.on_pushButton_play_clicked)
         left_layout.addWidget(self.pushButton_play)
@@ -197,7 +240,7 @@ class MainWindow(QMainWindow):
         
         # === Tab 2: Configuration ===
         tab_config = QWidget()
-        self.tabWidget.addTab(tab_config, QIcon("icons/if_tools_1054957.png"), "Configuration")
+        self.tabWidget.addTab(tab_config, QIcon(resource_path("icons", "if_tools_1054957.svg")), "Configuration")
         
         config_layout = QVBoxLayout(tab_config)
         grid = QGridLayout()
@@ -241,8 +284,8 @@ class MainWindow(QMainWindow):
         self.create_toolbar()
         
         # Status Bar
-        self.statusBar = QStatusBar()
-        self.setStatusBar(self.statusBar)
+        self.status_bar = QStatusBar()      # ← melhor nome
+        self.setStatusBar(self.status_bar)
         
         # Connect cursor change
         self.plainTextEdit_editor.cursorPositionChanged.connect(self.on_plainTextEdit_editor_cursorPositionChanged)
@@ -252,40 +295,118 @@ class MainWindow(QMainWindow):
         
         file_menu = menubar.addMenu("Fi&le")
         
-        save_action = QAction(QIcon("icons/Gnome-media-flash.png"), "&Save as abc file", self)
+        save_action = QAction(QIcon(resource_path("icons", "Gnome-media-flash.png")), "&Save as abc file", self)
         save_action.triggered.connect(self.on_actionSave_as_abc_file_triggered)
         file_menu.addAction(save_action)
         
-        open_action = QAction(QIcon("icons/folder-saved-search.png"), "&Open abc file", self)
+        open_action = QAction(QIcon(resource_path("icons", "folder-saved-search.svg")), "&Open abc file", self)
         open_action.triggered.connect(self.on_actionOpen_abc_file_triggered)
         file_menu.addAction(open_action)
         
-        save_data_action = QAction(QIcon("icons/svg.png"), "Save &data files", self)
+        save_data_action = QAction(QIcon(resource_path("icons", "svg.svg")), "Save &data files", self)
         save_data_action.triggered.connect(self.on_actionSave_data_files_triggered)
         file_menu.addAction(save_data_action)
         
         help_menu = menubar.addMenu("Help")
-        about_action = QAction(QIcon("icons/Information_icon.png"), "About", self)
-        about_action.triggered.connect(self.on_actionAbout_triggered)
+        about_action = QAction(QIcon(resource_path("icons", "Information_icon.svg")), "About", self)
+        about_action.triggered.connect(self.open_about)
         help_menu.addAction(about_action)
 
-    def create_toolbar(self):
-        toolbar = QToolBar()
-        toolbar.setIconSize(QSize(48, 48))
-        self.addToolBar(toolbar)
+    def create_toolbar(self):       
+        self.toolbar = self.addToolBar("Main")
+        self.toolbar.setIconSize(QSize(48, 48))
+        self.toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         
-        save_action = QAction(QIcon("icons/Gnome-media-flash.png"), "Save as abc file", self)
+        save_action = QAction(  QIcon(resource_path("icons", "Gnome-media-flash.png")), 
+                                "Save as abc file", 
+                                self)
         save_action.triggered.connect(self.on_actionSave_as_abc_file_triggered)
-        toolbar.addAction(save_action)
+        self.toolbar.addAction(save_action)
         
-        open_action = QAction(QIcon("icons/folder-saved-search.png"), "Open abc file", self)
+        open_action = QAction(  QIcon(resource_path("icons", "folder-saved-search.svg")), 
+                                "Open abc file", 
+                                self)
         open_action.triggered.connect(self.on_actionOpen_abc_file_triggered)
-        toolbar.addAction(open_action)
+        self.toolbar.addAction(open_action)
         
-        save_data_action = QAction(QIcon("icons/svg.png"), "Save data files", self)
+        save_data_action = QAction( QIcon(resource_path("icons", "svg.svg")), 
+                                    "Save data files", 
+                                    self)
         save_data_action.triggered.connect(self.on_actionSave_data_files_triggered)
-        toolbar.addAction(save_data_action)
+        self.toolbar.addAction(save_data_action)
 
+        # Adicionar o espaçador
+        self.toolbar_spacer = QWidget()
+        self.toolbar_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.toolbar.addWidget(self.toolbar_spacer)
+        
+        #
+        self.configure_action = QAction(QIcon.fromTheme("document-properties"), 
+                                        CONFIG["toolbar_configure"], 
+                                        self)
+        self.configure_action.setToolTip(CONFIG["toolbar_configure_tooltip"])
+        self.configure_action.triggered.connect(self.open_configure_editor)
+        self.toolbar.addAction(self.configure_action)
+        
+        #
+        self.about_action = QAction(QIcon.fromTheme("help-about"), 
+                                    CONFIG["toolbar_about"], 
+                                    self)
+        self.about_action.setToolTip(CONFIG["toolbar_about_tooltip"])
+        self.about_action.triggered.connect(self.open_about)
+        self.toolbar.addAction(self.about_action)
+        
+        # Coffee
+        self.coffee_action = QAction(   QIcon.fromTheme("emblem-favorite"), 
+                                        CONFIG["toolbar_coffee"], 
+                                        self)
+        self.coffee_action.setToolTip(CONFIG["toolbar_coffee_tooltip"])
+        self.coffee_action.triggered.connect(self.on_coffee_action_click)
+        self.toolbar.addAction(self.coffee_action)
+
+        # Conectar ao sinal de mudança de orientação
+        self.toolbar.orientationChanged.connect(self.on_update_spacer_policy)
+        self.on_update_spacer_policy()
+
+    def on_update_spacer_policy(self):
+        """Atualiza a política do espaçador baseado na orientação da toolbar"""
+        if self.toolbar.orientation() == Qt.Horizontal:
+            # Horizontal: expande na largura
+            self.toolbar_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        else:
+            # Vertical: expande na altura
+            self.toolbar_spacer.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+
+    def _open_file_in_text_editor(self, filepath):
+        if os.name == 'nt':  # Windows
+            os.startfile(filepath)
+        elif os.name == 'posix':  # Linux/macOS
+            subprocess.run(['xdg-open', filepath])
+    
+    def open_url_usage_editor(self):
+        QDesktopServices.openUrl(QUrl(CONFIG_GPT["usage"]))
+        
+    def open_configure_editor(self):
+        self._open_file_in_text_editor(CONFIG_PATH)
+
+    def open_about(self):
+        data={
+            "version": about.__version__,
+            "package": about.__package__,
+            "program_name": about.__program_name__,
+            "author": about.__author__,
+            "email": about.__email__,
+            "description": about.__description__,
+            "url_source": about.__url_source__,
+            "url_doc": about.__url_doc__,
+            "url_funding": about.__url_funding__,
+            "url_bugs": about.__url_bugs__
+        }
+        show_about_window(data,self.icon_path)
+
+    def on_coffee_action_click(self):
+        QDesktopServices.openUrl(QUrl("https://ko-fi.com/trucomanx"))
+        
     # === Helper methods ===
     def creating_abc_file(self, abcfilepath, code):
         file = QFile(abcfilepath)
@@ -358,9 +479,9 @@ class MainWindow(QMainWindow):
         QDir().mkpath(absoluteworkdir)
         
         if self.creating_abc_file(abcfile, abccode):
-            self.statusBar.showMessage(abcfile, 10000)
+            self.status_bar.showMessage(abcfile, 10000)
         else:
-            self.statusBar.showMessage("ERROR writing the file: " + abcfile, 10000)
+            self.status_bar.showMessage("ERROR writing the file: " + abcfile, 10000)
             return False
         
         if self.creating_svg_file(abcfile, svgfile):
@@ -371,9 +492,9 @@ class MainWindow(QMainWindow):
             self.scene.addPixmap(pixmap)
             self.graphicsView.setScene(self.scene)
             self.graphicsView.show()
-            self.statusBar.showMessage(svgfile, 10000)
+            self.status_bar.showMessage(svgfile, 10000)
         else:
-            self.statusBar.showMessage("ERROR writing the file: " + svgfile, 10000)
+            self.status_bar.showMessage("ERROR writing the file: " + svgfile, 10000)
             return False
         
         return True
@@ -480,16 +601,6 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "PNG file", "The document has been saved.")
         else:
             QMessageBox.warning(self, "PNG file", "The document has not been saved.")
-
-    def on_actionAbout_triggered(self):
-        text = (
-            "<b>Program:</b> ABC GUI Editor<br>"
-            "<b>Version:</b> 1.0<br>"
-            "<b>Homepage:</b> <a href=\"https://github.com\">https://github.com</a><br>"
-            "<b>Summary:</b> GUI to work with abc notation<br>"
-            "<b>Description:</b> A graphic user interface program to work with abc notation"
-        )
-        QMessageBox.about(self, "ABC Gui Editor", text)
 
 
 if __name__ == "__main__":
