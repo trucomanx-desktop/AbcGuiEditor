@@ -10,9 +10,9 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QStatusBar, QSizePolicy
 )
 
-from PyQt5.QtGui import QIcon, QDesktopServices, QSyntaxHighlighter, QFont, QTextCharFormat, QColor, QPixmap, QPainter, QTextCursor
+from PyQt5.QtGui  import QIcon, QDesktopServices, QSyntaxHighlighter, QFont, QTextCharFormat, QColor, QPixmap, QPainter, QTextCursor
 from PyQt5.QtCore import QDir, QFileInfo, QFile, QTextStream, QProcess, QRegularExpression, Qt, QUrl, QRegularExpressionMatchIterator, QSize
-from PyQt5.QtSvg import QSvgRenderer
+from PyQt5.QtSvg  import QSvgRenderer
 
 import abc_gui_editor.about as about
 import abc_gui_editor.modules.configure as configure 
@@ -180,7 +180,7 @@ class Highlighter(QSyntaxHighlighter):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, input_file):
         super().__init__()
 
         self.setWindowTitle(about.__program_name__)
@@ -207,6 +207,9 @@ class MainWindow(QMainWindow):
         self.lineEdit_abc2midi.setText("abc2midi")
         self.lineEdit_player.setText("totem")
         self.lineEdit_workdir.setText("temporal_abc-gui-editor_path")
+        
+        if os.path.isfile(input_file) and input_file.lower().endswith(".abc"):
+            self.load_abc_file(input_file)
         
     def setup_ui(self):
         # Central widget
@@ -624,13 +627,23 @@ class MainWindow(QMainWindow):
                                 CONFIG["msgbox_abc_file"], 
                                 CONFIG["msgbox_save_error"])
 
-    def on_actionOpen_abc_file_triggered(self):
-        abcfile, _ = QFileDialog.getOpenFileName(self, "Open ABC file", "", "ABC Files (*.abc *.ABC *.txt)")
+    def load_abc_file(self, abcfile):
         if not abcfile:
-            return
+            return None
+            
+            
         code = self.loading_abc_file(abcfile)
         if code is not None:
             self.plainTextEdit_editor.setPlainText(code)
+            
+        return code
+        
+    def on_actionOpen_abc_file_triggered(self):
+        abcfile, _ = QFileDialog.getOpenFileName(self, "Open ABC file", "", "ABC Files (*.abc *.ABC *.txt)")
+        
+        code = self.load_abc_file(abcfile)
+        
+        if code is not None:
             QMessageBox.information(self, 
                                     CONFIG["msgbox_abc_file"], 
                                     CONFIG["msgbox_open_success"])
@@ -688,10 +701,14 @@ def main():
             return
     '''
     
+    filepath=""
+    if len(sys.argv)>1:
+        filepath=sys.argv[1]
+        
     app = QApplication(sys.argv)
     app.setApplicationName(about.__package__) 
     
-    window = MainWindow()
+    window = MainWindow(filepath)
     window.show()
     sys.exit(app.exec_())
 
