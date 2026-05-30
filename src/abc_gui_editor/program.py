@@ -20,6 +20,7 @@ from abc_gui_editor.modules.resources import resource_path
 
 from abc_gui_editor.modules.wabout    import show_about_window
 from abc_gui_editor.desktop import create_desktop_file, create_desktop_directory, create_desktop_menu
+from abc_gui_editor.mimetype import ensure_mime_type
 
 
 # ---------- Path to config file ----------
