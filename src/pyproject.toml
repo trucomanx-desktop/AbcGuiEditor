@@ -18,8 +18,7 @@ license = "GPL-3.0-only WITH Classpath-Exception-2.0 OR BSD-3-Clause"
 license-files = ["LICENSE"]
 keywords = ["writing", "translate"]
 dependencies = [
-    "PyQt5",
-    "deep-consultation"
+    "PyQt5"
 ]
 
 [project.urls]
@@ -35,4 +34,4 @@ dependencies = [
 packages = ["abc_gui_editor", "abc_gui_editor.modules"]
 
 [tool.setuptools.package-data]
-"abc_gui_editor" = ["icons/logo.png"]
+"abc_gui_editor" = ["icons/*.png", "icons/*.svg"]
